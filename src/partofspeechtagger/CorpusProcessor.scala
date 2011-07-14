@@ -15,13 +15,13 @@ class CorpusProcessor(language: String, corpus: String, taggerType: String = "Wo
   val tagIntMap = new BijectiveHashMap[String, Int]
   val wordIntMap = new BijectiveHashMap[String, Int]
 
-  val DATA_DIR = "/home/vvasuki/posTagging/data/"
+  val DATA_DIR = Main.DATA_DIR
   val TEST_DIR = "test"
   val TRAINING_DIR = "train"
   val WIKTIONARY = DATA_DIR+"TEMP-S20110618.tsv"
 
   var unmappedTags = 0
-  val LANGUAGE_CODE_MAP = DATA_DIR+"languageCodes"
+  val LANGUAGE_CODE_MAP = getClass.getResource("languageCodes.properties").getPath
   val TAG_MAP_DIR = DATA_DIR+"universal_pos_tags.1.02/"
 
   var sentenceSeparatorTag = "###"

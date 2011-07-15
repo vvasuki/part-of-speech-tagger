@@ -9,8 +9,6 @@ import java.util.NoSuchElementException
 trait Tagger {
   val TAGNUM_IN = 25
   val WORDNUM_IN = 3000
-  var sentenceSepTag = 0
-  var sentenceSepWord = 0
   var bestTagsOverall = new LinkedList[Int]()
   def train(iter: Iterator[Array[Int]])
   def predict(testData: ArrayBuffer[Array[Int]]): ArrayBuffer[(Int, Boolean)]

@@ -6,10 +6,7 @@ import upenn.junto.graph._
 import scala.collection.mutable._
 import utils.collection._
 
-class LabelPropogationTagger(sentenceSepTagIn :Int, sentenceSepWordIn: Int) extends Tagger{
-  sentenceSepTag = sentenceSepTagIn
-  sentenceSepWord = sentenceSepWordIn
-
+class LabelPropagationTagger(sentenceSepTag :Int, sentenceSepWord: Int) extends Tagger{
   var wordAfterWordMap = new MatrixBufferRowSparse[Int](WORDNUM_IN)
   var wordTagMap = new MatrixBufferDense[Int](WORDNUM_IN, TAGNUM_IN)
   var numTrainingWords = 0

@@ -31,47 +31,49 @@ class CorpusProcessor(language: String, corpus: String, taggerType: String = "Wo
 
 
 
+
+  var languageCode = language
+  // Deduce language code
+  var parser = new TextTableParser(file = LANGUAGE_CODE_MAP, separator = ' ', x =>x.length >= 2, lineMapFn = null)
+  var iter = parser.getRowIterator.filter((x) => x(1).equalsIgnoreCase(language))
+  if(iter.hasNext)
+    languageCode = (iter.next())(0)
+  println(languageCode)
+  
 //  Confidence in correctness: High.
 //  Reason: Proved correct.
   var tagger: Tagger = new WordTagProbabilities()
   taggerType match {
+    case "OpenNLP" => tagger = new OpenNLP(sentenceSepTagId, sentenceSepWordId, languageCode)
     case "HMM" => tagger = new HMM(sentenceSepTagId, sentenceSepWordId)
-    case "LabelPropogationTagger" => tagger = new LabelPropogationTagger(sentenceSepTagId, sentenceSepWordId)
+    case "LabelPropagation" => tagger = new LabelPropagationTagger(sentenceSepTagId, sentenceSepWordId)
     case _ => tagger = new WordTagProbabilities()
   }
 
-  
 
-  var languageCode = ""
-//X - other: foreign words, typos, abbreviations
-//ADP - adpositions (prepositions and postpositions)
-//. - punctuation
-  val tagsUniversal = List("VERB", "NOUN", "PRON", "ADJ", "ADV", "ADP", "CONJ", "DET", "NUM", "PRT", "X", ".")
   val tagMap = new HashMap[String, String]()
-  val wiktionaryTagMap = new HashMap[String, String]()
-
+  //X - other: foreign words, typos, abbreviations
+  //ADP - adpositions (prepositions and postpositions)
+  //. - punctuation
+  val tagsUniversal = List("VERB", "NOUN", "PRON", "ADJ", "ADV", "ADP", "CONJ", "DET", "NUM", "PRT", "X", ".")
 
 //  Confidence in correctness: High.
 //  Reason: Well tested.
   if(Main.bUniversalTags)  {
-    // Deduce language code
-    var parser = new TextTableParser(file = LANGUAGE_CODE_MAP, separator = ' ', x =>x.length >= 2, lineMapFn = null)
-    var iter = parser.getRowIterator.filter((x) => x(1).equalsIgnoreCase(language))
-    languageCode = (iter.next())(0)
-    println(languageCode)
-
     // Populate the tagMap by reading the appropriate file.
     parser = new TextTableParser(file = TAG_MAP_DIR + languageCode + "-" + corpus + ".map", filterFnIn = (x =>x.length >= 2), lineMapFn = (x => x.map(_.toUpper)))
     parser.getRowIterator.foreach(x => tagMap(x(0)) = x(1))
     tagMap.values.foreach(x => tagMap(x) = x)
 
-    //  Add the universal tags themselves to the map.
+  //  Add the universal tags themselves to the map.
     tagsUniversal.foreach(x => tagMap(x) = x)
 //    print(tagMap)
   }
 
   if(Main.bWiktionary) processFile(WIKTIONARY)
   if(Main.bUseTrainingData) processFile(TRAINING_DIR)
+
+
 
   /*
    * Add mapping for a tag to the tag map.
@@ -158,6 +160,7 @@ class CorpusProcessor(language: String, corpus: String, taggerType: String = "Wo
 //  Confidence in correctness: High.
 //  Reason: Well tested.
   def processFile(mode: String) = {
+
     def getFileName(fileType: String): String = {
       var languageCorpusString = language;
       if(!corpus.equals("")) languageCorpusString = languageCorpusString + '/' + corpus
@@ -177,28 +180,40 @@ class CorpusProcessor(language: String, corpus: String, taggerType: String = "Wo
     val file = getFileName(mode)
 //    println(file)
 
-    var wordField = 1
-    var tagField = 3;
-    var sep = '\t'
-    if(language.equals("danish")) tagField = 4
-    if(corpus.equals("")) {
-      wordField = 0; tagField = 1; sep = '/'
+//    @return Iterator[Array[Int]] whose elements are arrays of size 2, whose
+//      first element is the wordId and second element is the corresponding tagId.
+//    Confidence in correctness: High
+//    Reason: Used many times without problems.
+    def getWordTagIteratorFromFile: Iterator[Array[Int]] = {
+//      Determine wordField, tagField, sep
+      var wordField = 1
+      var tagField = 3;
+      var sep = '\t'
+      if(language.equals("danish")) tagField = 4
+      if(corpus.equals("")) {
+        wordField = 0; tagField = 1; sep = '/'
+      }
+      if(mode.equals(WIKTIONARY))tagField = 2
+
+
+//      Prepare a function to map empty lines to an empty sentence word/ token pair.
+      var newSentenceLine = sentenceSeparatorWord;
+      for(i <- 1 to tagField) newSentenceLine = newSentenceLine + sep + sentenceSeparatorTag
+      var lineMap = (x:String)=> {var y = x.trim;
+                                  if(y.isEmpty()) y= newSentenceLine;
+                                  y.map(_.toUpper)}
+
+//      Prepare a function to filter the lines from the stream based on whether they have the right number of fields and language-tags.
+      var filterFn = ((x:Array[String]) => (x.length >= tagField+1))
+      if(mode.equals(WIKTIONARY))
+        filterFn = ((x:Array[String]) => ((x.length >= tagField+1) && x(0).equalsIgnoreCase(language)))
+
+      val parser = new TextTableParser(file = file, separator = sep, filterFnIn = filterFn, lineMapFn = lineMap)
+      parser.getFieldIterator(wordField, tagField).map(x => Array(getWordId(x(0)), getTagId(x(1), x(0))))
     }
-    if(mode.equals(WIKTIONARY))tagField = 2
 
+    val iter = getWordTagIteratorFromFile
 
-    var filterFn = ((x:Array[String]) => (x.length >= tagField+1))
-    if(mode.equals(WIKTIONARY))
-      filterFn = ((x:Array[String]) => ((x.length >= tagField+1) && x(0).equalsIgnoreCase(language)))
-
-    var newSentenceLine = sentenceSeparatorWord;
-    for(i <- 1 to tagField) newSentenceLine = newSentenceLine + sep + sentenceSeparatorTag
-    var lineMap = (x:String)=> {var y = x.trim;
-                                if(y.isEmpty()) y= newSentenceLine;
-                                y.map(_.toUpper)}
-
-    val parser = new TextTableParser(file = file, separator = sep, filterFnIn = filterFn, lineMapFn = lineMap)
-    val iter = parser.getFieldIterator(wordField, tagField).map(x => Array(getWordId(x(0)), getTagId(x(1), x(0))))
     if(!mode.equals(TEST_DIR)) {
       tagger.train(iter)
     }
@@ -209,7 +224,7 @@ class CorpusProcessor(language: String, corpus: String, taggerType: String = "Wo
       val tags = tagger.predict(testData)
       for {i <- tags.indices.iterator
         if(testData(i)(0) != sentenceSepWordId)
-     }{
+      }{
         var wordId = testData(i)(0)
         var tagId = testData(i)(1)
         var tagBest = tags(i)._1

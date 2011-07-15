@@ -5,9 +5,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.LinkedList
 import utils.collection._
 
-class HMM(sentenceSepTagIn :Int, sentenceSepWordIn: Int) extends Tagger{
-  sentenceSepTag = sentenceSepTagIn
-  sentenceSepWord = sentenceSepWordIn
+class HMM(sentenceSepTag :Int, sentenceSepWord: Int) extends Tagger{
   var wordTagCount = new MatrixBufferDense[Int](WORDNUM_IN, TAGNUM_IN)
   var logPrTagGivenTag = new MatrixBufferDense[Double](TAGNUM_IN, TAGNUM_IN)
   var logPrWordGivenTag = new MatrixBufferDense[Double](WORDNUM_IN, TAGNUM_IN)

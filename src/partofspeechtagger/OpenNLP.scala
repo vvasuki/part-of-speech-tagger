@@ -63,9 +63,9 @@ class OpenNLP(languageCode: String, sentenceSepTagStr :String, sentenceSepWordSt
 //    model is set appropriately.
   def train(wordTagIter: Iterator[Array[String]]) = {
     val sentenceStream = new TaggedSentenceStream(wordTagIter)
-    val numIters = 15
+    val numIters = 100; val eventCutoff = 5
     model = POSTaggerME.train(languageCode.map(_.toLower), sentenceStream, ModelType.MAXENT,
-      null, null, 100, numIters);
+      null, null, eventCutoff, numIters);
   }
   
 //  Confidence in correctness: High.

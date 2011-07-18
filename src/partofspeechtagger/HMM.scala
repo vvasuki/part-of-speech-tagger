@@ -5,7 +5,10 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.LinkedList
 import utils.collection._
 
-class HMM(sentenceSepTag :Int, sentenceSepWord: Int) extends Tagger{
+class HMM(sentenceSepTagStr :String, sentenceSepWordStr: String) extends Tagger{
+  val sentenceSepTag = getTagId(sentenceSepTagStr)
+  val sentenceSepWord = getWordId(sentenceSepWordStr)
+
   var wordTagCount = new MatrixBufferDense[Int](WORDNUM_IN, TAGNUM_IN)
   var logPrTagGivenTag = new MatrixBufferDense[Double](TAGNUM_IN, TAGNUM_IN)
   var logPrWordGivenTag = new MatrixBufferDense[Double](WORDNUM_IN, TAGNUM_IN)
@@ -15,12 +18,12 @@ class HMM(sentenceSepTag :Int, sentenceSepWord: Int) extends Tagger{
 
 //  Confidence in correctness: High.
 //  Reason: Well tested.
-  def train(iter: Iterator[Array[Int]]) = {
+  def train(iter: Iterator[Array[String]]) = {
     var tokenCount = 0
     var prevTag = sentenceSepTag
     var tagBeforeTagCount = new MatrixBufferDense[Int](TAGNUM_IN, TAGNUM_IN)
     var singletonWordsPerTag = new ExpandingArray[Int](TAGNUM_IN)
-    for(fields <- iter){
+    for(fields <- iter.map(x => Array(getWordId(x(0)), getTagId(x(1))))){
       var tag = fields(1); var word = fields(0)
 //      println(prevTag+ " t " + tag + " w "+ word)
       wordTagCount.increment(word, tag)
@@ -70,11 +73,12 @@ class HMM(sentenceSepTag :Int, sentenceSepWord: Int) extends Tagger{
   
 //  Confidence in correctness: High.
 //  Reason: Well tested.
-  def predict(testData: ArrayBuffer[Array[Int]]): ArrayBuffer[(Int, Boolean)] = {
+  def predict(testDataIn: ArrayBuffer[Array[String]]): ArrayBuffer[Array[Boolean]] = {
+    val testData = testDataIn.map(x => Array(getWordId(x(0)), getTagId(x(1))))
     val numTokens = testData.length
     val numTags = tagCount.length;
-    var finalTags = new ArrayBuffer[(Int, Boolean)](numTokens)
-    finalTags = finalTags.padTo(numTokens, (0, false))
+    var resultPair = new ArrayBuffer[Array[Boolean]](numTokens)
+    resultPair = resultPair.padTo(numTokens, null)
     
     var bestPrevTag = new MatrixBufferDense[Int](numTokens + 1, numTags)
     var logPrSequence = new MatrixBufferDense[Double](numTokens + 1, numTags, defaultValue=math.log(0))
@@ -99,18 +103,22 @@ class HMM(sentenceSepTag :Int, sentenceSepWord: Int) extends Tagger{
 //      println("# "+tokenNum + " w " + token + " tg "+ tag + " tg_{-1} "+ bestPrevTag(tokenNum, tag))
     }
 
-    finalTags(numTokens-1) = (logPrSequence(numTokens).indexOf(logPrSequence(numTokens).max), testData(numTokens-1)(0) >= numWords)
-    var perplexity = math.exp(-logPrSequence(numTokens, finalTags(numTokens-1)._1)/numTokens)
+    val bestTags = new Array[Int](numTokens)
+
+    bestTags(numTokens-1) = logPrSequence(numTokens).indexOf(logPrSequence(numTokens).max)
+    resultPair(numTokens-1) = Array(testData(numTokens-1)(1) == bestTags(numTokens-1), testData(numTokens-1)(0) >= numWords)
+    var perplexity = math.exp(-logPrSequence(numTokens, bestTags(numTokens-1))/numTokens)
     println("Perplexity: " + perplexity)
 
     for(tokenNum <- numTokens-2 to 0 by -1) {
       var token = testData(tokenNum)(0)
-      var bestTag = bestPrevTag(tokenNum+2, finalTags(tokenNum+1)._1)
-      if(token < numWords) finalTags(tokenNum) = (bestTag, false)
-      else finalTags(tokenNum) = (bestTag, true)
-//      println(tokenNum + " : " + token + " : "+ finalTags(tokenNum))
+      bestTags(tokenNum) = bestPrevTag(tokenNum+2, bestTags(tokenNum+1))
+      val bNovel = token >= numWords
+      resultPair(tokenNum) = Array(bestTags(tokenNum) == testData(tokenNum)(1), bNovel)
+      
+//      println(tokenNum + " : " + token + " : "+ resultPair(tokenNum))
     }
-    finalTags
+    resultPair
   }
 
 }

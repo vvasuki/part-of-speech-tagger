@@ -12,9 +12,6 @@ class CorpusProcessor(language: String, corpus: String, taggerType: String = "Wo
   var correctTaggingsKnown = 0
   var correctTaggingsNovel = 0
 
-  val tagIntMap = new BijectiveHashMap[String, Int]
-  val wordIntMap = new BijectiveHashMap[String, Int]
-
   val DATA_DIR = Main.DATA_DIR
   val TEST_DIR = "test"
   val TRAINING_DIR = "train"
@@ -24,10 +21,8 @@ class CorpusProcessor(language: String, corpus: String, taggerType: String = "Wo
   val LANGUAGE_CODE_MAP = getClass.getResource("languageCodes.properties").getPath
   val TAG_MAP_DIR = DATA_DIR+"universal_pos_tags.1.02/"
 
-  var sentenceSeparatorTag = "###"
-  var sentenceSeparatorWord = "###"
-  val sentenceSepWordId = getWordId(sentenceSeparatorWord)
-  val sentenceSepTagId = getTagId(sentenceSeparatorTag, sentenceSeparatorWord)
+  val sentenceSepTag = "###"
+  val sentenceSepWord = "###"
 
 
 
@@ -42,12 +37,12 @@ class CorpusProcessor(language: String, corpus: String, taggerType: String = "Wo
   
 //  Confidence in correctness: High.
 //  Reason: Proved correct.
-  var tagger: Tagger = new WordTagProbabilities()
+  var tagger: Tagger = null
   taggerType match {
-    case "OpenNLP" => tagger = new OpenNLP(sentenceSepTagId, sentenceSepWordId, languageCode)
-    case "HMM" => tagger = new HMM(sentenceSepTagId, sentenceSepWordId)
-    case "LabelPropagation" => tagger = new LabelPropagationTagger(sentenceSepTagId, sentenceSepWordId)
-    case _ => tagger = new WordTagProbabilities()
+    case "OpenNLP" => tagger = new OpenNLP( languageCode, sentenceSepTag, sentenceSepWord)
+    case "HMM" => tagger = new HMM(sentenceSepTag, sentenceSepWord)
+    case "LabelPropagation" => tagger = new LabelPropagationTagger(sentenceSepTag, sentenceSepWord)
+    case _ => tagger = new WordTagProbabilities(sentenceSepTag, sentenceSepWord)
   }
 
 
@@ -75,66 +70,44 @@ class CorpusProcessor(language: String, corpus: String, taggerType: String = "Wo
 
 
 
-  /*
-   * Add mapping for a tag to the tag map.
-   * Assumption: There is no pre-existing mapping.
-   * Arguments: tagIn: the tag to be added.
-   *  word: A word corresponding to the tag; used for printing a helpful message.
-   */
-//  Confidence in correctness: High.
-//  Reason: Well tested.
-  def updateTagMap(tagIn: String, word: String): Unit= {
-    var tag = tagIn.map(_.toUpper)
-    if(tagMap.contains(tag)) throw new IllegalArgumentException("Mapping already exists")
-    var iter = tagsUniversal.filter(x => !(x.equals("X") || x.equals(".")))
-    for(tagUniversal <- iter) {
-      if(tag.indexOf(tagUniversal) != -1) {tagMap(tag) = tagUniversal; return}
-    }
-//    Begin special cases
-//ADP - adpositions (prepositions and postpositions)
-    if(tag.indexOf("POSITION") != -1) {tagMap(tag) = "ADP"; return}
-//X - other: foreign words, typos, abbreviations
-    if(tag.indexOf("ABBREV") != -1 || tag.indexOf("FOREIGN") != -1 || tag.indexOf("ACRONYM") != -1 || tag.indexOf("INITIAL") != -1) {tagMap(tag) = "X"; return}
-//. - punctuation
-    if(tag.indexOf("PUNCTUAT") != -1) {tagMap(tag) = "X"; return}
-    if(tag.indexOf("PARTICLE") != -1) {tagMap(tag) = "PRT"; return}
-    if(tag.indexOf("ARTICLE") != -1) {tagMap(tag) = "DET"; return}
-    unmappedTags = unmappedTags+1
-    println("unmapped tag "+tag + " :word "+ word);
-    tagMap(tag) = tag;
-  }
-
-//  Confidence in correctness: High.
-//  Reason: Well tested.
-  def getTagId(tagIn: String, word: String): Int = {
-    /*
-     * Map a tag, update the mapping if necessary.
-     */
 //  Confidence in correctness: High.
 //  Reason: Proved.
-    def getMappedTag(tagIn1: String, word: String): String = {
-      var tag = tagIn1
-      try{tag = tagMap(tag);}
-      catch{case e => updateTagMap(tag, word)}
-      return tag
+  def getMappedTag(tagIn1: String, word: String): String = {
+    /*
+     * Add mapping for a tag to the tag map.
+     * Assumption: There is no pre-existing mapping.
+     * Arguments: tagIn: the tag to be added.
+     *  word: A word corresponding to the tag; used for printing a helpful message.
+     */
+  //  Confidence in correctness: High.
+  //  Reason: Well tested.
+    def updateTagMap(tagIn: String, word: String): Unit= {
+      var tag = tagIn.map(_.toUpper)
+      if(tagMap.contains(tag)) throw new IllegalArgumentException("Mapping already exists")
+      var iter = tagsUniversal.filter(x => !(x.equals("X") || x.equals(".")))
+      for(tagUniversal <- iter) {
+        if(tag.indexOf(tagUniversal) != -1) {tagMap(tag) = tagUniversal; return}
+      }
+  //    Begin special cases
+  //ADP - adpositions (prepositions and postpositions)
+      if(tag.indexOf("POSITION") != -1) {tagMap(tag) = "ADP"; return}
+  //X - other: foreign words, typos, abbreviations
+      if(tag.indexOf("ABBREV") != -1 || tag.indexOf("FOREIGN") != -1 || tag.indexOf("ACRONYM") != -1 || tag.indexOf("INITIAL") != -1) {tagMap(tag) = "X"; return}
+  //. - punctuation
+      if(tag.indexOf("PUNCTUAT") != -1) {tagMap(tag) = "X"; return}
+      if(tag.indexOf("PARTICLE") != -1) {tagMap(tag) = "PRT"; return}
+      if(tag.indexOf("ARTICLE") != -1) {tagMap(tag) = "DET"; return}
+      unmappedTags = unmappedTags+1
+      println("unmapped tag "+tag + " :word "+ word);
+      tagMap(tag) = tag;
     }
 
-    var tag = tagIn
-    if(Main.bUniversalTags)
-      tag = getMappedTag(tag, word)
-
-    if(!tagIntMap.contains(tag))
-      tagIntMap.put(tag, tagIntMap.size)
-    tagIntMap(tag)
+    var tag = tagIn1
+    try{tag = tagMap(tag);}
+    catch{case e => updateTagMap(tag, word)}
+    return tag
   }
 
-//  Confidence in correctness: High.
-//  Reason: Well tested.
-  def getWordId(word: String): Int = {
-    if(!wordIntMap.contains(word))
-      wordIntMap.put(word, wordIntMap.size)
-    wordIntMap(word)
-  }
 
 //  Confidence in correctness: High.
 //  Reason: Well tested.
@@ -146,8 +119,8 @@ class CorpusProcessor(language: String, corpus: String, taggerType: String = "Wo
     var accuracyKnown = correctTaggingsKnown/ numTestTokensKnown.toDouble
     var accuracyNovel = correctTaggingsNovel/ numTestTokensNovel.toDouble
 
-    printf("Accuracy: %.2f, (Known: %.2f, Novel: %.2f)\n", accuracy, accuracyKnown, accuracyNovel)
-    printf("Non training words: %d, %.2f\n", numTestTokensNovel, numTestTokensNovel/numTestTokens.toDouble)
+    printf("Accuracy: %.3f, (Known: %.3f, Novel: %.3f)\n", accuracy, accuracyKnown, accuracyNovel)
+    printf("Non training tokens: %d, %.3f\n", numTestTokensNovel, numTestTokensNovel/numTestTokens.toDouble)
   }
 
   def test = {
@@ -180,11 +153,11 @@ class CorpusProcessor(language: String, corpus: String, taggerType: String = "Wo
     val file = getFileName(mode)
 //    println(file)
 
-//    @return Iterator[Array[Int]] whose elements are arrays of size 2, whose
-//      first element is the wordId and second element is the corresponding tagId.
+//    @return Iterator[Array[String]] whose elements are arrays of size 2, whose
+//      first element is the word and second element is the corresponding tag.
 //    Confidence in correctness: High
 //    Reason: Used many times without problems.
-    def getWordTagIteratorFromFile: Iterator[Array[Int]] = {
+    def getWordTagIteratorFromFile: Iterator[Array[String]] = {
 //      Determine wordField, tagField, sep
       var wordField = 1
       var tagField = 3;
@@ -197,8 +170,8 @@ class CorpusProcessor(language: String, corpus: String, taggerType: String = "Wo
 
 
 //      Prepare a function to map empty lines to an empty sentence word/ token pair.
-      var newSentenceLine = sentenceSeparatorWord;
-      for(i <- 1 to tagField) newSentenceLine = newSentenceLine + sep + sentenceSeparatorTag
+      var newSentenceLine = sentenceSepWord;
+      for(i <- 1 to tagField) newSentenceLine = newSentenceLine + sep + sentenceSepTag
       var lineMap = (x:String)=> {var y = x.trim;
                                   if(y.isEmpty()) y= newSentenceLine;
                                   y.map(_.toUpper)}
@@ -209,7 +182,11 @@ class CorpusProcessor(language: String, corpus: String, taggerType: String = "Wo
         filterFn = ((x:Array[String]) => ((x.length >= tagField+1) && x(0).equalsIgnoreCase(language)))
 
       val parser = new TextTableParser(file = file, separator = sep, filterFnIn = filterFn, lineMapFn = lineMap)
-      parser.getFieldIterator(wordField, tagField).map(x => Array(getWordId(x(0)), getTagId(x(1), x(0))))
+      parser.getFieldIterator(wordField, tagField).map(x => {
+          var tag = x(1); var word = x(0);
+          if(Main.bUniversalTags) tag = getMappedTag(tag, word)
+          Array(word, tag)
+        })
     }
 
     val iter = getWordTagIteratorFromFile
@@ -218,20 +195,17 @@ class CorpusProcessor(language: String, corpus: String, taggerType: String = "Wo
       tagger.train(iter)
     }
     else {
-      val testData = new ArrayBuffer[Array[Int]](10000)
+      val testData = new ArrayBuffer[Array[String]](10000)
       iter.copyToBuffer(testData)
       println(testData.length)
-      val tags = tagger.predict(testData)
-      for {i <- tags.indices.iterator
-        if(testData(i)(0) != sentenceSepWordId)
+      val resultPair = tagger.predict(testData)
+      for {i <- testData.indices.iterator
+        if(testData(i)(0) != sentenceSepWord)
       }{
-        var wordId = testData(i)(0)
-        var tagId = testData(i)(1)
-        var tagBest = tags(i)._1
-        var bNovelToken = tags(i)._2
-        var bCorrect = tagBest.equals(tagId)
-//        if(!bCorrect)
-//            println(wordId + " " + tagIntMap.getKey(tagBest) + " " + tagIntMap.getKey(tagId))
+        val tag = testData(i)(0);
+        val bCorrect  = resultPair(i)(0)
+        val bNovelToken = resultPair(i)(1)
+        
         if(!bNovelToken) {
           if(bCorrect) correctTaggingsKnown  = correctTaggingsKnown  + 1
           numTestTokensKnown = numTestTokensKnown + 1;

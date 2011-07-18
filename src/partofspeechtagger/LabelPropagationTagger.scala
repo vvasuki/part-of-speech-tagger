@@ -6,9 +6,12 @@ import upenn.junto.graph._
 import scala.collection.mutable._
 import utils.collection._
 
-class LabelPropagationTagger(sentenceSepTag :Int, sentenceSepWord: Int) extends Tagger{
-  var wordAfterWordMap = new MatrixBufferRowSparse[Int](WORDNUM_IN)
-  var wordTagMap = new MatrixBufferDense[Int](WORDNUM_IN, TAGNUM_IN)
+class LabelPropagationTagger(sentenceSepTagStr :String, sentenceSepWordStr: String) extends Tagger{
+  val sentenceSepTag = getTagId(sentenceSepTagStr)
+  val sentenceSepWord = getWordId(sentenceSepWordStr)
+
+  val wordAfterWordMap = new MatrixBufferRowSparse[Int](WORDNUM_IN)
+  val wordTagMap = new MatrixBufferDense[Int](WORDNUM_IN, TAGNUM_IN)
   var numTrainingWords = 0
   var numTags = 0
 
@@ -17,9 +20,9 @@ class LabelPropagationTagger(sentenceSepTag :Int, sentenceSepWord: Int) extends 
 //    numTags and numTrainingWords.
 //  Confidence in correctness: High.
 //  Reason: proved correct.
-  def train(iter: Iterator[Array[Int]]) = {
+  def train(iter: Iterator[Array[String]]) = {
     var prevToken = sentenceSepWord
-    for(Array(token, tag) <- iter){
+    for(Array(token, tag) <- iter.map(x => Array(getWordId(x(0)), getTagId(x(1))))){
       wordTagMap.increment(token, tag)
       wordAfterWordMap.increment(token, prevToken)
       prevToken = token
@@ -107,7 +110,8 @@ class LabelPropagationTagger(sentenceSepTag :Int, sentenceSepWord: Int) extends 
 //
 //  Confidence in correctness: Low.
 //  Reason: Proved correct but test on ic database fails to produce expected results.
-  def predict(testData: ArrayBuffer[Array[Int]]): ArrayBuffer[(Int, Boolean)] = {
+  def predict(testDataIn: ArrayBuffer[Array[String]]): ArrayBuffer[Array[Boolean]] = {
+    val testData = testDataIn.map(x => Array(getWordId(x(0)), getTagId(x(1))))
 
 //  Tasks:
 //    Update wordAfterWordMap with information from testData.
@@ -146,17 +150,17 @@ class LabelPropagationTagger(sentenceSepTag :Int, sentenceSepWord: Int) extends 
     var graph = getGraph(expectedLabels)
     JuntoRunner(graph, 1.0, .01, .01, 50, false)
     
-    var tags = new ArrayBuffer[(Int, Boolean)](testData.length)
-//    tags = tags.padTo(testData.length, (0, false))
+    var resultPair = new ArrayBuffer[Array[Boolean]](testData.length)
+//    resultPair = resultPair.padTo(testData.length, (0, false))
 //      Get tag lables from graph.
     for(Array(token, actualTag) <- testData) {
-      var bNovelWord = (token >= numTrainingWords)
-      var tagStr = graph._vertices.get(nodeNamer.w(token)).getEstimatedLabelBest()
+      val bNovelWord = (token >= numTrainingWords)
+      val tagStr = graph._vertices.get(nodeNamer.w(token)).getEstimatedLabelBest()
+      val bCorrect = nodeNamer.getId(tagStr) == actualTag
       println("token: "+ token + " tag "+ tagStr)
-      
-      tags += ((nodeNamer.getId(tagStr), bNovelWord))
+      resultPair += Array(bCorrect, bNovelWord)
     }
-    tags
+    resultPair
   }
 
 }

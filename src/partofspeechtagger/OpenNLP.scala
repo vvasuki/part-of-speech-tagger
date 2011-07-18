@@ -41,7 +41,7 @@ class OpenNLP(languageCode: String, sentenceSepTagStr :String, sentenceSepWordSt
       var words = new ArrayBuffer[String](20)
       var tags = new ArrayBuffer[String](20)
 
-      wordTagIter.takeWhile(x => x(1) != sentenceSepTag).foreach(x => {
+      wordTagIter.takeWhile(x => x(1) != sentenceSepTagStr).foreach(x => {
           getWordId(x(0)); // update wordIntMap.
           words += x(0); tags += x(1)})
 //      println(words)
@@ -90,7 +90,7 @@ class OpenNLP(languageCode: String, sentenceSepTagStr :String, sentenceSepWordSt
         resultPair += Array(bCorrect, bNovel)
         })
       // Add a result corresponding to correct tagging of sentence-separator word.
-      if(testData(resultPair.length - 1)(0) == sentenceSepWord)
+      if(1 <= testData.length - resultPair.length )
         resultPair += Array(true, false)
       sample = sentenceStream.read
     }

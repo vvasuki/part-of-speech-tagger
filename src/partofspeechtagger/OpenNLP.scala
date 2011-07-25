@@ -42,7 +42,7 @@ class OpenNLP(languageCode: String, sentenceSepTagStr :String, sentenceSepWordSt
       var tags = new ArrayBuffer[String](20)
 
       wordTagIter.takeWhile(x => x(1) != sentenceSepTagStr).foreach(x => {
-          getWordId(x(0)); // update wordIntMap.
+          getWordId(x(0).map(_.toUpper)); // update wordIntMap.
           words += x(0); tags += x(1)})
 //      println(words)
 //      println(tags)
@@ -76,7 +76,7 @@ class OpenNLP(languageCode: String, sentenceSepTagStr :String, sentenceSepWordSt
     var resultPair = new ArrayBuffer[Array[Boolean]](numTokens + 1)
 
     val tagger = new POSTaggerME(model);
-    val sentenceStream = new TaggedSentenceStream(testData.iterator)
+    var sentenceStream = new TaggedSentenceStream(testData.iterator)
 
     var sample = sentenceStream.read
     while(sample != null){
@@ -85,7 +85,7 @@ class OpenNLP(languageCode: String, sentenceSepTagStr :String, sentenceSepWordSt
       val tagsPredicted = tagger.tag(tokens)
       val sentenceLength = tokens.length
       tokens.indices.foreach(i => {
-        val bNovel = getWordId(tokens(i)) >= numWords
+        val bNovel = getWordId(tokens(i).map(_.toUpper)) >= numWords
         val bCorrect = tagsActual(i) == tagsPredicted(i)
         resultPair += Array(bCorrect, bNovel)
         })
@@ -93,6 +93,19 @@ class OpenNLP(languageCode: String, sentenceSepTagStr :String, sentenceSepWordSt
       if(1 <= testData.length - resultPair.length )
         resultPair += Array(true, false)
       sample = sentenceStream.read
+    }
+
+    // openNLP's Evaluator
+    // Confidence: High
+    // Reason: Proved correct.
+    // Observed to yield same result as above.
+    def openNLPEval = {
+      sentenceStream = new TaggedSentenceStream(testData.iterator)
+      val evaluator =
+          new POSEvaluator(new opennlp.tools.postag.POSTaggerME(model));
+      System.out.print("Evaluating ... ");
+      evaluator.evaluate(sentenceStream);
+      System.out.println("Accuracy: " + evaluator.getWordAccuracy());
     }
 
     resultPair

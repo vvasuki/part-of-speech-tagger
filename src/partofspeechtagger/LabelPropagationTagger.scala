@@ -156,7 +156,7 @@ class LabelPropagationTagger(sentenceSepTagStr :String, sentenceSepWordStr: Stri
     for(Array(token, actualTag) <- testData) {
       val bNovelWord = (token >= numTrainingWords)
       val tagStr = graph._vertices.get(nodeNamer.w(token)).getEstimatedLabelBest()
-      val bCorrect = nodeNamer.getId(tagStr) == actualTag
+      val bCorrect = tagStr.toInt == actualTag
       println("token: "+ token + " tag "+ tagStr)
       resultPair += Array(bCorrect, bNovelWord)
     }

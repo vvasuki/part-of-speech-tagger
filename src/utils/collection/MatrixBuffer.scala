@@ -165,7 +165,8 @@ class MatrixBufferRowSparse[T] (rowsIn: Int, defaultValue: T = null.asInstanceOf
 //  Reason: Proved correct.
   def update(row: Int, col: Int, value: T) = {
     expandBuffer(row, col)
-    matrix(row) = matrix(row) + (col -> value)
+    if(value == 0) matrix(row) = matrix(row) - col
+    else matrix(row) = matrix(row) + (col -> value)
   }
   
 //  Confidence in correctness: High.
